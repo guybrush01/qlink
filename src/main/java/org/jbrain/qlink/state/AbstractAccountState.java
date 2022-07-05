@@ -168,7 +168,7 @@ public class AbstractAccountState extends AbstractPhaseState {
           stmt.setInt(1, iUserID);
           stmt.setString(2,sPrimary);
           stmt.setString(3, handle.toString());
-          stmt.executeQuery();
+          stmt.execute();
           if (stmt.getUpdateCount() > 0) {
             // get account number.
             rs = stmt.getGeneratedKeys();
@@ -182,10 +182,10 @@ public class AbstractAccountState extends AbstractPhaseState {
             _log.info("Handle '" + handle + "' could not be inserted");
           }
         } else {
-          _log.info("Handle '" + handle + "' already in use");
+          _log.info("Handle '" + handle + "' already in use - Determined by UserManager");
         }
       } catch (SQLException e) {
-        _log.info("Handle '" + handle + "' already in use");
+        _log.info("Handle '" + handle + "' already in use", e);
       }
     }
     return id;
