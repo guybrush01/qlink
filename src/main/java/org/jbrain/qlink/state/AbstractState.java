@@ -24,11 +24,9 @@ Created on Jul 23, 2005
 package org.jbrain.qlink.state;
 
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.*;
+import java.util.Date;
 
 import org.apache.log4j.Logger;
 import org.jbrain.qlink.QSession;
@@ -115,18 +113,17 @@ public abstract class AbstractState implements QState {
   /** @return */
   protected boolean checkEmail() {
     Connection conn = null;
-    Statement stmt = null;
+    PreparedStatement stmt = null;
     ResultSet rs = null;
 
     try {
       conn = DBUtils.getConnection();
-      stmt = conn.createStatement();
+      stmt = conn.prepareStatement(
+              "SELECT email_id FROM email WHERE unread='Y' AND recipient_id=? LIMIT 1");
+      stmt.setInt(1, _session.getAccountID());
       _log.debug("Checking for email to " + _session.getHandle());
       rs =
-          stmt.executeQuery(
-              "SELECT email_id FROM email WHERE unread='Y' AND recipient_id="
-                  + _session.getAccountID()
-                  + " LIMIT 1");
+          stmt.executeQuery();
       return rs.next();
     } catch (SQLException e) {
       _log.error("SQL Exception", e);

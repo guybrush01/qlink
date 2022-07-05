@@ -104,7 +104,7 @@ public class AbstractAccountState extends AbstractPhaseState {
           iUserID = rs.getInt(1);
           _sSecurityCode = code;
           DBUtils.close(rs);
-          int id = addScreenName(stmt, iUserID, true, handle);
+          int id = addScreenName(conn, stmt, iUserID, true, handle);
           if (id > -1) {
             rc = true;
             _session.setAccountInfo(
@@ -132,12 +132,12 @@ public class AbstractAccountState extends AbstractPhaseState {
   protected int addScreenName(int iUserID, QHandle handle) {
     int id = -1;
     Connection conn = null;
-    Statement stmt = null;
+    PreparedStatement stmt = null;
 
     try {
       conn = DBUtils.getConnection();
-      stmt = conn.createStatement();
-      id = addScreenName(stmt, iUserID, false, handle);
+
+      id = addScreenName(conn, stmt, iUserID, false, handle);
     } catch (SQLException e) {
       _log.error("SQL Exception", e);
     } finally {
@@ -147,11 +147,13 @@ public class AbstractAccountState extends AbstractPhaseState {
     return id;
   }
   /**
+   *
+   * @param conn
    * @param stmt
    * @param handle
    * @return
    */
-  private int addScreenName(Statement stmt, int iUserID, boolean bPrimary, QHandle handle) {
+  private int addScreenName(Connection conn, PreparedStatement stmt, int iUserID, boolean bPrimary, QHandle handle) {
     ResultSet rs = null;
     int id = -1;
     String sPrimary = (bPrimary ? "Y" : "N");
@@ -160,15 +162,13 @@ public class AbstractAccountState extends AbstractPhaseState {
     synchronized (_log) {
       try {
         if (UserManager.getAccount(handle) == null) {
-          stmt.execute(
-              "INSERT INTO accounts (user_id,primary_ind,active,handle,create_date,last_access,last_update,refresh) VALUES ("
-                  + iUserID
-                  + ",'"
-                  + sPrimary
-                  + "','Y','"
-                  + handle
-                  + "',now(),now(),now(),'N')",
-              Statement.RETURN_GENERATED_KEYS);
+          stmt = conn.prepareStatement("INSERT INTO accounts (user_id,primary_ind,active,handle,create_date," +
+                  "last_access,last_update,refresh) VALUES (?,?,'Y',?,now(),now(),now(),'N')",
+                  Statement.RETURN_GENERATED_KEYS);
+          stmt.setInt(1, iUserID);
+          stmt.setString(2,sPrimary);
+          stmt.setString(3, handle.toString());
+          stmt.executeQuery();
           if (stmt.getUpdateCount() > 0) {
             // get account number.
             rs = stmt.getGeneratedKeys();

@@ -24,10 +24,7 @@ Created on Jul 23, 2005
 package org.jbrain.qlink.state;
 
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.text.DecimalFormat;
 
 import org.apache.log4j.Logger;
@@ -153,7 +150,7 @@ public class Authentication extends AbstractAccountState {
 
   protected void validateUser() throws IOException {
     Connection conn = null;
-    Statement stmt = null;
+    PreparedStatement stmt = null;
     ResultSet rs = null;
     QHandle handle;
     long id = -1;
@@ -163,11 +160,11 @@ public class Authentication extends AbstractAccountState {
       try {
         id = Long.parseLong(_sAccount);
         conn = DBUtils.getConnection();
-        stmt = conn.createStatement();
-        rs =
-            stmt.executeQuery(
-                "SELECT accounts.staff_ind, users.name, users.user_id,accounts.primary_ind, users.access_code,users.active,accounts.active,accounts.handle,accounts.refresh from accounts,users WHERE accounts.user_id=users.user_id AND accounts.account_id="
-                    + id);
+        stmt = conn.prepareStatement("SELECT accounts.staff_ind, users.name, users.user_id,accounts.primary_ind, " +
+                        "users.access_code,users.active,accounts.active,accounts.handle,accounts.refresh from " +
+                        "accounts,users WHERE accounts.user_id=users.user_id AND accounts.account_id=?");
+        stmt.setLong(1, id);
+        rs = stmt.executeQuery();
       } catch (NumberFormatException e) {
         _log.info("Account code '" + _sAccount + "' not a number, new user");
       }

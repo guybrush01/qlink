@@ -23,10 +23,7 @@ Created on Jul 28, 2005
 */
 package org.jbrain.qlink.chat;
 
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.*;
 
 import org.apache.log4j.Logger;
@@ -76,18 +73,17 @@ class AuditoriumDelegate extends RoomDelegate {
 //
     public void run() {
       Connection conn = null;
-      Statement stmt = null;
+      PreparedStatement stmt = null;
       ResultSet rs = null;
 
       try {
         conn = DBUtils.getConnection();
-        stmt = conn.createStatement();
+        stmt = conn.prepareStatement(
+                "SELECT delay,text from auditorium_talk WHERE mnemonic LIKE ? order by sort_order");
+        stmt.setString(1, _sKey);
         _log.debug("Reading auditorium text key" + _sKey);
         rs =
-            stmt.executeQuery(
-                "SELECT delay,text from auditorium_talk WHERE mnemonic LIKE '"
-                    + _sKey
-                    + "' order by sort_order");
+            stmt.executeQuery();
         while (rs.next()) {
           output(_qlink, rs.getString("text"));
           try {
@@ -169,7 +165,7 @@ class AuditoriumDelegate extends RoomDelegate {
   }
 // this 
   /**
-   * @param user
+   * @param seat
    * @param text
    */
   protected void processCommand(SeatInfo seat, String text) {
