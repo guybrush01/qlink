@@ -93,7 +93,7 @@ public class QLinkServer {
       };
   /** @param session */
   public void addSession(QSession session) {
-    if (!_vSessions.contains(session)) {
+    if (!_vSessions.contains(session) && session.getHandle() != null && session.getHandle().getKey() != null) {
       _log.info("Adding session to session list: " + session.getHandle().getKey());
       _vSessions.add(session);
       _newest = new Date();
