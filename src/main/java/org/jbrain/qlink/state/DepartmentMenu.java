@@ -118,14 +118,14 @@ public class DepartmentMenu extends AbstractMenuState {
     } else if (a instanceof GetSerial) {//KT  SKERN
 			rc = true;
 			int id = ((GetSerial) a).getID();
-			_log.debug("Client put the seral nubrer of File in."+id);
+			_log.debug("Client put the serial number of File in."+id);
 			displayFileInfo(id);
 	    //memory is broken :-(
 	    
 	 } else if (a instanceof InitDataSend) {//KC  SKERN
 			rc = true;
 			int id = 805;
-			_log.debug("Client put the seral nubrer of File in."+id);
+			_log.debug("Client put the serial number of File in."+id);
 			
 			displayFileInfo(id);
 					
@@ -210,14 +210,15 @@ public class DepartmentMenu extends AbstractMenuState {
   /** @param id */
   private void setCount(int id) throws IOException {
     Connection conn = null;
-    Statement stmt = null;
+    PreparedStatement stmt = null;
    
     try {
       conn = DBUtils.getConnection();
-      stmt = conn.createStatement();
+      stmt = conn.prepareStatement("update files set downloads=downloads+1 where reference_id=?");
+      stmt.setInt(1, id);
       _log.debug("add cont " + id + " of download");
     
-      stmt.execute ("update files set downloads=downloads+1 where reference_id=" + id);
+      stmt.execute ();
       
     } catch (SQLException e) {
       _log.error("SQL Exception", e);
@@ -235,18 +236,16 @@ public class DepartmentMenu extends AbstractMenuState {
   /** @param id */
   private void openStream(int id) throws IOException {
     Connection conn = null;
-    Statement stmt = null;
+    PreparedStatement stmt = null;
     ResultSet rs = null;
 
     try {
       conn = DBUtils.getConnection();
-      stmt = conn.createStatement();
+      stmt = conn.prepareStatement("SELECT name, filetype, downloads, LENGTH(data) as length, data from files where reference_id=?");
+      stmt.setInt(1, id);
       _log.debug("Selecting file " + id + " for download");
-    
-     
       rs =
-          stmt.executeQuery(
-              "SELECT name, filetype, downloads, LENGTH(data) as length, data from files where reference_id=" + id);
+          stmt.executeQuery();
       if (rs.next()) {
         // get our File length.
         int mid = rs.getInt("length");
@@ -287,14 +286,15 @@ public class DepartmentMenu extends AbstractMenuState {
    */
   private int selectDatedReply(int id, Date date) {
     Connection conn = null;
-    Statement stmt = null;
+    PreparedStatement stmt = null;
     ResultSet rs = null;
 
     try {
       conn = DBUtils.getConnection();
-      stmt = conn.createStatement();
+      stmt = conn.prepareStatement("SELECT message_id, parent_id from messages where reference_id=?");
+      stmt.setInt(1, id);
       _log.debug("Searching for reply after " + date);
-      rs = stmt.executeQuery("SELECT message_id, parent_id from messages where reference_id=" + id);
+      rs = stmt.executeQuery();
       if (rs.next()) {
         // get our message ID.
         int mid = rs.getInt("message_id");
@@ -302,24 +302,15 @@ public class DepartmentMenu extends AbstractMenuState {
         int pid = rs.getInt("parent_id");
         if (pid != _iCurrParentID)
           _log.error(
-              "Select Dated Reply id "
-                  + id
-                  + " has parent="
-                  + pid
-                  + ", but current ParentID value="
-                  + _iCurrParentID);
+                  MessageFormat.format("Select Dated Reply id {0} has parent={1}, but current ParentID value={2}", id, pid, _iCurrParentID));
         DBUtils.close(rs);
         SimpleDateFormat sdf = new SimpleDateFormat("MM/dd/yyyy");
         // now, look for new replies.
-        rs =
-            stmt.executeQuery(
-                "SELECT reference_id from messages where parent_id="
-                    + pid
-                    + " AND message_id > "
-                    + mid
-                    + " AND date > '"
-                    + sdf.format(date)
-                    + " LIMIT 1");
+        stmt = conn.prepareStatement("SELECT reference_id from messages where parent_id = ? AND message_id > ? AND date > ? LIMIT 1");
+        stmt.setInt(1, pid);
+        stmt.setInt(2, mid);
+        stmt.setString(3,sdf.format(date));
+        rs = stmt.executeQuery();
         if (rs.next()) {
           id = rs.getInt("reference_id");
         } else {
@@ -346,16 +337,16 @@ public class DepartmentMenu extends AbstractMenuState {
 
   private void selectItem(int id) throws IOException {
     Connection conn = null;
-    Statement stmt = null;
+    PreparedStatement stmt = null;
     ResultSet rs = null;
 
     try {
       conn = DBUtils.getConnection();
-      stmt = conn.createStatement();
+      stmt = conn.prepareStatement("SELECT entry_type, cost, special FROM entry_types WHERE reference_id=?");
+      stmt.setInt(1, id);
       _log.debug("Selecting Item: " + id);
       rs =
-          stmt.executeQuery(
-              "SELECT entry_type, cost, special FROM entry_types WHERE reference_id=" + id);
+          stmt.executeQuery();
       if (rs.next()) {
         int type = rs.getInt("entry_type");
         String cost = rs.getString("cost");
@@ -395,11 +386,11 @@ public class DepartmentMenu extends AbstractMenuState {
               enterChat(id);
               break;
             case MenuItem.BROWSE://SKERN
-              _log.debug("Item is a seartch intem, du it");
+              _log.debug("Item is a search item, do it");
               displayDBTextFile(id);
               break; 
             case MenuItem.SERIAL://SKERN
-              _log.debug("Item is a seartch serial intem, du it");
+              _log.debug("Item is a search serial item, do it");
               displayFileInfo(id);
               break; 
 			case MenuItem.ONEMOMENT://SKERN
@@ -432,16 +423,17 @@ public class DepartmentMenu extends AbstractMenuState {
   /** @param id */
   private void enterChat(int id) throws IOException {
     Connection conn = null;
-    Statement stmt = null;
+    PreparedStatement stmt = null;
     ResultSet rs = null;
     String room;
     int port;
 
     try {
       conn = DBUtils.getConnection();
-      stmt = conn.createStatement();
+      stmt = conn.prepareStatement("SELECT room from vendor_rooms where reference_id=?");
+      stmt.setInt(1, id);
       _log.debug("Get room information for  Chat ID: " + id);
-      rs = stmt.executeQuery("SELECT room from vendor_rooms where reference_id=" + id);
+      rs = stmt.executeQuery();
       if (rs.next()) {
         room = rs.getString("room");
         QState state = new SimpleChat(_session, room);
@@ -467,16 +459,17 @@ public class DepartmentMenu extends AbstractMenuState {
    */
   protected void connectToGateway(int id) throws IOException {
     Connection conn = null;
-    Statement stmt = null;
+    PreparedStatement stmt = null;
     ResultSet rs = null;
     String address;
     int port;
 
     try {
       conn = DBUtils.getConnection();
-      stmt = conn.createStatement();
+      stmt = conn.prepareStatement("SELECT address,port from gateways where gateway_id=?");
+      stmt.setInt(1, id);
       _log.debug("Get file information for  Gateway ID: " + id);
-      rs = stmt.executeQuery("SELECT address,port from gateways where gateway_id=" + id);
+      rs = stmt.executeQuery();
       if (rs.next()) {
         address = rs.getString("address");
         port = rs.getInt("port");
@@ -505,15 +498,16 @@ public class DepartmentMenu extends AbstractMenuState {
   /** @param id */
   private boolean setHandler(int id) throws IOException {
     Connection conn = null;
-    Statement stmt = null;
+    PreparedStatement stmt = null;
     ResultSet rs = null;
     QState state = null;
 
     try {
       conn = DBUtils.getConnection();
-      stmt = conn.createStatement();
+      stmt = conn.prepareStatement("SELECT handler FROM reference_handlers WHERE reference_id=?");
+      stmt.setInt(1, id);
       _log.debug("Selecting Special item: " + id);
-      rs = stmt.executeQuery("SELECT handler FROM reference_handlers WHERE reference_id=" + id);
+      rs = stmt.executeQuery();
       if (rs.next()) {
         String clazz = rs.getString("handler");
         _log.debug("Found Handler: " + clazz);
@@ -552,7 +546,7 @@ public class DepartmentMenu extends AbstractMenuState {
 
   private void displayFileInfo(int id) throws IOException {
     Connection conn = null;
-    Statement stmt = null;
+    PreparedStatement stmt = null;
     ResultSet rs = null;
    
     String name;
@@ -570,11 +564,11 @@ public class DepartmentMenu extends AbstractMenuState {
     _iNextMessageID = 0;
     try {
       conn = DBUtils.getConnection();
-      stmt = conn.createStatement();
+      stmt = conn.prepareStatement("SELECT name, filetype, downloads, LENGTH(data) as length, data from files where reference_id=?");
+      stmt.setInt(1, id);
       _log.debug("Get file information for FileID: " + id);
       rs =
-          stmt.executeQuery(
-              "SELECT name, filetype, downloads, LENGTH(data) as length, data from files where reference_id=" + id);
+          stmt.executeQuery();
       _log.debug("Get message information for baseID: " + id);        
      
       if (rs.next()) {	
@@ -597,10 +591,11 @@ public class DepartmentMenu extends AbstractMenuState {
        ;
         
         _log.debug("filename " + filename + "type " + type + " Lengs " + mid );
-       
+
+        stmt = conn.prepareStatement("SELECT title,  date, author, title, replies, text from messages WHERE reference_id=?");
+        stmt.setInt(1, id);
         rs =
-            stmt.executeQuery(
-                "SELECT title,  date, author, title, replies, text from messages WHERE reference_id="+ id);
+            stmt.executeQuery();
         if (rs.next()) {
           String header =rs.getString("title");
           date = rs.getDate("date");
@@ -642,7 +637,9 @@ public class DepartmentMenu extends AbstractMenuState {
         _log.debug("Filename:" + name );
 	}
        // temp testing
-	        	rs=stmt.executeQuery("SELECT reference_id FROM messages WHERE parent_id=" + id + " LIMIT 1");
+                stmt = conn.prepareStatement("SELECT reference_id FROM messages WHERE parent_id=? LIMIT 1");
+                stmt.setInt(1, id);
+	        	rs=stmt.executeQuery();
 	        	if(rs.next()) {
 	        		_iNextMessageID=rs.getInt("reference_id");
 	        	}
@@ -660,7 +657,7 @@ public class DepartmentMenu extends AbstractMenuState {
         
         
         _session.send(new InitDataSend(id, 0, 0, _iNextMessageID, 0));
-        _session.send(new FileText("fount no intem. press F5 ", true));
+        _session.send(new FileText("Found no item. press F5 ", true));
       }
     } catch (SQLException e) {
       _log.error("SQL Exception", e);
@@ -675,7 +672,7 @@ public class DepartmentMenu extends AbstractMenuState {
       DBUtils.close(conn);
     }
   }
-   /** @param number, lenght
+   /** @param n, lenght
     *  */
    
   public static String leftPad(int n, int padding) {
@@ -690,7 +687,7 @@ public class DepartmentMenu extends AbstractMenuState {
   /** @param id */
   private void displayMessage(int id) throws IOException {
     Connection conn = null;
-    Statement stmt = null;
+    PreparedStatement stmt = null;
     ResultSet rs = null;
     int next = 0;
     int mid;
@@ -703,14 +700,14 @@ public class DepartmentMenu extends AbstractMenuState {
     _iNextMessageID = 0;
     try {
       conn = DBUtils.getConnection();
-      stmt = conn.createStatement();
+      stmt = conn.prepareStatement("SELECT base_id,parent_id, message_id,text FROM messages WHERE reference_id=?");
+      stmt.setInt(1, id);
       _log.debug("Querying for message "+ id);
       String text;
       String test="";
       String data="";
       rs =
-          stmt.executeQuery(
-              "SELECT base_id,parent_id, message_id,text FROM messages WHERE reference_id=" + id);
+          stmt.executeQuery();
       if (rs.next()) {
         text = rs.getString("text");
        // text="SUBJ: ....."; 
@@ -728,13 +725,10 @@ public class DepartmentMenu extends AbstractMenuState {
         if (pid == 0) pid = id;
         DBUtils.close(rs);
         // are there any replies to either this message or it's parent?
-        rs =
-            stmt.executeQuery(
-                "SELECT reference_id FROM messages WHERE message_id>"
-                    + mid
-                    + " AND parent_id="
-                    + pid
-                    + " LIMIT 1");
+        stmt = conn.prepareStatement("SELECT reference_id FROM messages WHERE message_id>? AND parent_id=? LIMIT 1");
+        stmt.setInt(1, mid);
+        stmt.setInt(2, pid);
+        rs = stmt.executeQuery();
         if (rs.next()) {
           _iNextMessageID = rs.getInt("reference_id");
    
@@ -758,13 +752,11 @@ public class DepartmentMenu extends AbstractMenuState {
       DBUtils.close(conn);
     }
        DBUtils.close(rs);
+        stmt = conn.prepareStatement("SELECT reference_id FROM messages WHERE message_id<? AND parent_id=? ORDER BY message_id DESC LIMIT 1");
+        stmt.setInt(1, mid);
+        stmt.setInt(2, pid);
           rs =
-              stmt.executeQuery(
-                  "SELECT reference_id FROM messages WHERE message_id<"
-                      + mid
-                      + " AND parent_id="
-                      + pid
-                      + " ORDER BY message_id DESC LIMIT 1");
+              stmt.executeQuery();
           if (rs.next()) {
             prev = rs.getInt("reference_id");
             _log.debug("File Message ID: " + id + " has previous message ID: " + prev);
@@ -800,11 +792,10 @@ public class DepartmentMenu extends AbstractMenuState {
   //SKERN ----------------------------------------------------------------
   /**
    * @param id
-   * @param url
    */
   private void displayDBFileText(int id) throws IOException {
     Connection conn = null;
-    Statement stmt = null;
+    PreparedStatement stmt = null;
     ResultSet rs = null;
     boolean bData = false;
      int num = 0;
@@ -816,17 +807,14 @@ public class DepartmentMenu extends AbstractMenuState {
  
     try {
       conn = DBUtils.getConnection();
-      stmt = conn.createStatement();
+      stmt = conn.prepareStatement("SELECT reference_id,parent_id, title,author, date,replies from messages WHERE " +
+              "base_id=? order by message_id");
       _log.debug("Querying for filetext file");
       String data;
-      int pid = 0, bid=0, prev = 0, replies = 0, mid = 0; 
+      int pid = 0, bid=0, prev = 0, replies = 0, mid = 0;
+      stmt.setInt(1, id);
       rs =
-          stmt.executeQuery(
-              "SELECT reference_id,parent_id, title,author, date,replies from messages WHERE base_id="
-                  + id
-                  + " "
-                  
-                  + " order by message_id");
+          stmt.executeQuery();
         if (rs.next()) {
 			 bid = id;
 			  replies = rs.getInt("replies");
@@ -841,7 +829,9 @@ public class DepartmentMenu extends AbstractMenuState {
       }
 	}
       int  next = 0;
-      rs = stmt.executeQuery("SELECT next_id,prev_id,data FROM articles WHERE article_id=" + id);
+      stmt = conn.prepareStatement("SELECT next_id,prev_id,data FROM articles WHERE article_id=?");
+      stmt.setInt(1, id);
+      rs = stmt.executeQuery();
       if (rs.next()) {
         prev = rs.getInt("prev_id");
         next = rs.getInt("next_id");
@@ -877,21 +867,21 @@ public class DepartmentMenu extends AbstractMenuState {
 //-------------------------------------------------------------------------------------
   /**
    * @param id
-   * @param url
    */
   private void displayDBTextFile(int id) throws IOException {
     Connection conn = null;
-    Statement stmt = null;
+    PreparedStatement stmt = null;
     ResultSet rs = null;
     boolean bData = false;
 
     try {
       conn = DBUtils.getConnection();
-      stmt = conn.createStatement();
+      stmt = conn.prepareStatement("SELECT next_id,prev_id,data FROM articles WHERE article_id=?");
+      stmt.setInt(1, id);
       _log.debug("Querying for file text file");
       String data;
       int prev = 0, next = 0;
-      rs = stmt.executeQuery("SELECT next_id,prev_id,data FROM articles WHERE article_id=" + id);
+      rs = stmt.executeQuery();
       if (rs.next()) {
         prev = rs.getInt("prev_id");
         next = rs.getInt("next_id");
@@ -927,7 +917,7 @@ public class DepartmentMenu extends AbstractMenuState {
   private void selectMenu(int id) throws IOException {
     boolean rc = false;
     Connection conn = null;
-    Statement stmt = null;
+    PreparedStatement stmt = null;
     ResultSet rs = null;
     boolean bData = false;
     int type = 0;
@@ -941,13 +931,13 @@ public class DepartmentMenu extends AbstractMenuState {
     _iCurrMenuID = id;
     try {
       conn = DBUtils.getConnection();
-      stmt = conn.createStatement();
+      stmt = conn.prepareStatement("SELECT toc.reference_id,toc.title,entry_types.entry_type,entry_types.cost " +
+              "FROM toc,entry_types WHERE toc.reference_id=entry_types.reference_id and toc.menu_id=? AND toc.active='Y' " +
+              "ORDER by toc.sort_order");
+      stmt.setInt(1, id);
       _log.debug("Querying for menu");
       rs =
-          stmt.executeQuery(
-              "SELECT toc.reference_id,toc.title,entry_types.entry_type,entry_types.cost FROM toc,entry_types WHERE toc.reference_id=entry_types.reference_id and toc.menu_id="
-                  + id
-                  + " AND toc.active='Y' ORDER by toc.sort_order");
+          stmt.executeQuery();
       while (rs.next()) {
         bData = true;
         type = rs.getInt("entry_types.entry_type");
