@@ -94,7 +94,10 @@ public class ReadEmailState extends AbstractState {
       rs = stmt.executeQuery();
       if (rs.next()) {
         String body = rs.getString("body");
-        stmt.execute("UPDATE email SET unread='N' WHERE email_id=" + rs.getInt("email_id"));
+        int emailId = rs.getInt("email_id");
+        stmt = conn.prepareStatement("UPDATE email SET unread='N' WHERE email_id=?");
+        stmt.setInt(1, emailId);
+        stmt.execute();
         if (stmt.getUpdateCount() > 0) {
           _log.debug("Updated email to read");
         } else {

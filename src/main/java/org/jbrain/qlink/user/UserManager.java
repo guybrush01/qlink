@@ -34,19 +34,19 @@ public class UserManager {
 
   public static List getAccountsforUser(int id) {
     Connection conn = null;
-    Statement stmt = null;
+    PreparedStatement stmt = null;
     ResultSet rs = null;
     List l = new ArrayList();
 
     try {
       conn = DBUtils.getConnection();
-      stmt = conn.createStatement();
+      stmt = conn.prepareStatement(
+              "SELECT staff_ind,primary_ind, user_id,account_id,handle,refresh from accounts where user_id=? " +
+                      "order by create_date");
+      stmt.setInt(1, id);
       _log.debug("Checking for accounts for User ID: " + id);
       rs =
-          stmt.executeQuery(
-              "SELECT staff_ind,primary_ind, user_id,account_id,handle,refresh from accounts where user_id="
-                  + id
-                  + " order by create_date");
+          stmt.executeQuery();
       createObjects(l, rs);
     } catch (SQLException e) {
       _log.error("SQL Exception", e);
@@ -60,19 +60,18 @@ public class UserManager {
 
   public static AccountInfo getAccount(QHandle handle) {
     Connection conn = null;
-    Statement stmt = null;
+    PreparedStatement stmt = null;
     ResultSet rs = null;
     AccountInfo info = null;
 
     try {
       conn = DBUtils.getConnection();
-      stmt = conn.createStatement();
+      stmt = conn.prepareStatement(
+              "SELECT staff_ind,primary_ind, user_id,account_id,handle,refresh from accounts where REPLACE(handle,' ','') LIKE ?");
+      stmt.setString(1, handle.getKey() );
       _log.debug("Getting Account information for '" + handle + "'");
       rs =
-          stmt.executeQuery(
-              "SELECT staff_ind,primary_ind, user_id,account_id,handle,refresh from accounts where REPLACE(handle,' ','') LIKE '"
-                  + handle.getKey()
-                  + "'");
+          stmt.executeQuery();
       if (rs.next()) info = populateAccountInfo(rs);
     } catch (SQLException e) {
       _log.error("SQL Exception", e);
@@ -86,19 +85,19 @@ public class UserManager {
 
   public static List getSubAccountsforUser(int id) {
     Connection conn = null;
-    Statement stmt = null;
+    PreparedStatement stmt = null;
     ResultSet rs = null;
     List l = new ArrayList();
 
     try {
       conn = DBUtils.getConnection();
-      stmt = conn.createStatement();
+      stmt = conn.prepareStatement(
+              "SELECT staff_ind,primary_ind, user_id,account_id,handle,refresh from accounts where primary_ind='N' " +
+                      "and user_id=? order by create_date");
+      stmt.setInt(1, id);
       _log.debug("Checking for sub accounts for User ID: " + id);
       rs =
-          stmt.executeQuery(
-              "SELECT staff_ind,primary_ind, user_id,account_id,handle,refresh from accounts where primary_ind='N' and user_id="
-                  + id
-                  + " order by create_date");
+          stmt.executeQuery();
       createObjects(l, rs);
     } catch (SQLException e) {
       _log.error("SQL Exception", e);
@@ -143,7 +142,11 @@ public class UserManager {
   public static void deleteUser(int userID) throws Exception {
     // TODO make this throw a better exception.
     try {
-      if (executeSQL("DELETE from users where user_id=" + userID) == 0) {
+      Connection conn = DBUtils.getConnection();
+      PreparedStatement stmt = conn.prepareStatement("DELETE from users where user_id=" + userID);
+      stmt.setInt(1, userID);
+      stmt.executeUpdate();
+      if (stmt.getUpdateCount() == 0) {
         throw new Exception("Update Count==0");
       }
     } catch (Exception e) {
@@ -184,7 +187,7 @@ public class UserManager {
     String sql;
 
     try {
-      sql = "UPDATE users SET name = ?, city = ?, state = ?, country = ? " + "WHERE user_id = ?";
+      sql = "UPDATE users SET name = ?, city = ?, state = ?, country = ? WHERE user_id = ?";
       pstmt = DBUtils.getConnection().prepareStatement(sql);
       pstmt.setString(1, name);
       pstmt.setString(2, city);
