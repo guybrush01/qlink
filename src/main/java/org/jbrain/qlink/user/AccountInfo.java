@@ -23,10 +23,7 @@ Created on Sep 29, 2005
 */
 package org.jbrain.qlink.user;
 
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -44,10 +41,12 @@ public class AccountInfo {
   private boolean _bStaff;
 
   /**
+   * @param userid
    * @param acct
-   * @param i
    * @param b
-   * @param string
+   * @param handle
+   * @param bRefresh
+   * @param bStaff
    */
   public AccountInfo(
       int userid, int acct, boolean b, String handle, boolean bRefresh, boolean bStaff) {
@@ -83,7 +82,17 @@ public class AccountInfo {
 
     if (_log.isDebugEnabled())
       _log.debug("Updating user name '" + getHandle() + "' refresh status to: '" + sRefresh + "'");
-    executeSQL("UPDATE accounts set refresh='" + sRefresh + "' where account_id=" + getAccountID());
+
+    try {
+      Connection conn = DBUtils.getConnection();
+      PreparedStatement stmt = conn.prepareStatement("UPDATE accounts set refresh=? where account_id=?");
+      stmt.setString(1, sRefresh);
+      stmt.setInt(2, getAccountID());
+      executeSQL(stmt);
+    } catch (SQLException e) {
+      _log.error("SQL Exception", e);
+      throw new AccountUpdateException();
+    }
     _bRefresh = b;
   }
 
@@ -93,8 +102,16 @@ public class AccountInfo {
     if (_log.isDebugEnabled())
       _log.debug(
           "Updating user name '" + getHandle() + "' primary account status to: '" + sRefresh + "'");
-    executeSQL(
-        "UPDATE accounts set primary_ind='" + sRefresh + "' where account_id=" + getAccountID());
+    try {
+      Connection conn = DBUtils.getConnection();
+      PreparedStatement stmt = conn.prepareStatement("UPDATE accounts set primary_ind='" + sRefresh + "' where account_id=" + getAccountID());
+      stmt.setString(1, sRefresh);
+      stmt.setInt(2, getAccountID());
+      executeSQL(stmt);
+    } catch (SQLException e) {
+      _log.error("SQL Exception",e);
+      throw new AccountUpdateException();
+    }
     _bPrimary = b;
   }
 
@@ -109,14 +126,22 @@ public class AccountInfo {
    */
   public void delete() throws AccountUpdateException {
     _log.debug("Deleting account for '" + getHandle() + "'");
-    executeSQL("DELETE from accounts WHERE account_id=" + getAccountID());
+    try {
+      Connection conn = DBUtils.getConnection();
+      PreparedStatement stmt = conn.prepareStatement("DELETE from accounts WHERE account_id=?");
+      stmt.setInt(1, getAccountID());
+      executeSQL(stmt);
+    } catch (SQLException e) {
+      _log.error("SQL Exception", e);
+      throw new AccountUpdateException();
+    }
   }
 
   /**
-   * @param string
+   * @param sql
    * @throws AccountUpdateException
    */
-  private void executeSQL(String sql) throws AccountUpdateException {
+  /*private void executeSQL(String sql) throws AccountUpdateException {
     Connection conn = null;
     Statement stmt = null;
     ResultSet rs = null;
@@ -134,6 +159,25 @@ public class AccountInfo {
       DBUtils.close(stmt);
       DBUtils.close(conn);
     }
+  }*/
+
+  private void executeSQL(PreparedStatement stmt) throws AccountUpdateException {
+    try {
+      stmt.execute();
+      if (stmt.getUpdateCount() == 0) throw new AccountUpdateException("Update Count=0");
+    } catch (SQLException e) {
+      _log.error("SQL Exception",e);
+      throw new AccountUpdateException();
+    } finally {
+      Connection conn = null;
+      try {
+        conn = stmt.getConnection();
+      } catch (SQLException e) {
+        // Ignore
+      }
+      DBUtils.close(stmt);
+      DBUtils.close(conn);
+    }
   }
 
   /** @return */
@@ -147,7 +191,16 @@ public class AccountInfo {
    */
   public void setUserID(int userID) throws AccountUpdateException {
     _log.debug("Setting userid for '" + getHandle() + "' to: " + userID);
-    executeSQL("UPDATE accounts SET user_id=" + userID + " where account_id=" + getAccountID());
+    try {
+      Connection conn = DBUtils.getConnection();
+      PreparedStatement stmt = conn.prepareStatement("UPDATE accounts SET user_id=? where account_id=?");
+      stmt.setInt(1, userID);
+      stmt.setInt(2, getAccountID());
+      executeSQL(stmt);
+    } catch (SQLException e) {
+      _log.error("SQL Exception", e);
+      throw new AccountUpdateException();
+    }
     _iUserID = userID;
   }
 
